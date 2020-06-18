@@ -80,7 +80,7 @@ namespace System.Text.Json
         /// <remarks>
         /// Once serialization or deserialization occurs, the list cannot be modified.
         /// </remarks>
-        public IList<JsonConverter> Converters { get; }
+        public JsonConverters Converters { get; }
 
         internal JsonConverter DetermineConverter(Type? parentClassType, Type runtimePropertyType, PropertyInfo? propertyInfo)
         {

@@ -37,6 +37,7 @@
     <Compile Include="Serialization\Array.WriteTests.cs" />
     <Compile Include="Serialization\CacheTests.cs" />
     <Compile Include="Serialization\CamelCaseUnitTests.cs" />
+    <Compile Include="Serialization\CodeGenTests\SimplePoco.cs" />
     <Compile Include="Serialization\CollectionTests\CollectionTests.Concurrent.Write.cs" />
     <Compile Include="Serialization\CollectionTests\CollectionTests.Concurrent.cs" />
     <Compile Include="Serialization\CollectionTests\CollectionTests.Dictionary.cs" />
@@ -144,5 +145,8 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ref\System.Text.Json.csproj" />
   </ItemGroup>
 </Project>

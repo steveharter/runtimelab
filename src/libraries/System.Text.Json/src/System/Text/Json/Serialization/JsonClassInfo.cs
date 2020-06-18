@@ -4,27 +4,42 @@
 
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Converters;
 
 namespace System.Text.Json
 {
     [DebuggerDisplay("ClassType.{ClassType}, {Type.Name}")]
-    internal sealed partial class JsonClassInfo
+    public sealed partial class JsonClassInfo
     {
-        public delegate object? ConstructorDelegate();
+        // todo: add immutable checks in all setters like we do in JsonSerializerOptions
 
-        public delegate T ParameterizedConstructorDelegate<T>(object[] arguments);
+        internal delegate object? ConstructorDelegate();
 
-        public delegate T ParameterizedConstructorDelegate<T, TArg0, TArg1, TArg2, TArg3>(TArg0 arg0, TArg1 arg1, TArg2 arg2, TArg3 arg3);
+        internal delegate T ParameterizedConstructorDelegate<T>(object[] arguments);
 
-        public ConstructorDelegate? CreateObject { get; private set; }
+        internal delegate T ParameterizedConstructorDelegate<T, TArg0, TArg1, TArg2, TArg3>(TArg0 arg0, TArg1 arg1, TArg2 arg2, TArg3 arg3);
 
-        public object? CreateObjectWithArgs { get; set; }
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="writer"></param>
+        /// <param name="value"></param>
+        /// <param name="writeStack"></param>
+        /// <param name="options"></param>
+        public delegate void SerializeDelegate(Utf8JsonWriter writer, object value, ref WriteStack writeStack, JsonSerializerOptions options);
 
-        public ClassType ClassType { get; private set; }
+        internal ConstructorDelegate? CreateObject { get; private set; }
 
-        public JsonPropertyInfo? DataExtensionProperty { get; private set; }
+        internal SerializeDelegate? Serialize { get; private set; }
+
+        internal object? CreateObjectWithArgs { get; set; }
+
+        internal ClassType ClassType { get; private set; }
+
+        internal JsonPropertyInfo? DataExtensionProperty { get; private set; }
 
         // If enumerable, the JsonClassInfo for the element type.
         private JsonClassInfo? _elementClassInfo;
@@ -36,7 +51,7 @@ namespace System.Text.Json
         /// This should not be called during warm-up (initial creation of JsonClassInfos) to avoid recursive behavior
         /// which could result in a StackOverflowException.
         /// </remarks>
-        public JsonClassInfo? ElementClassInfo
+        internal JsonClassInfo? ElementClassInfo
         {
             get
             {
@@ -52,10 +67,16 @@ namespace System.Text.Json
             }
         }
 
-        public Type? ElementType { get; set; }
+        internal Type? ElementType { get; set; }
 
+        /// <summary>
+        /// todo
+        /// </summary>
         public JsonSerializerOptions Options { get; private set; }
 
+        /// <summary>
+        /// todo
+        /// </summary>
         public Type Type { get; private set; }
 
         /// <summary>
@@ -74,9 +95,22 @@ namespace System.Text.Json
         /// ClassInfo (for the cases mentioned above). In addition, methods that have a JsonPropertyInfo argument would also likely
         /// need to add an argument for JsonClassInfo.
         /// </remarks>
-        public JsonPropertyInfo PropertyInfoForClassInfo { get; private set; }
+        internal JsonPropertyInfo PropertyInfoForClassInfo { get; private set; }
 
-        public JsonClassInfo(Type type, JsonSerializerOptions options)
+        internal JsonClassInfo(
+            Type type,
+            JsonConverter converter,
+            SerializeDelegate serializeFunc,
+            JsonSerializerOptions options)
+        {
+            Options = options;
+            Type = type;
+            PropertyCache = new Dictionary<string, JsonPropertyInfo>();
+            PropertyInfoForClassInfo = CreatePropertyInfoForClassInfo(type, type, converter, options);
+            Serialize = serializeFunc;
+        }
+
+        internal JsonClassInfo(Type type, JsonSerializerOptions options)
         {
             Type = type;
             Options = options;
@@ -96,7 +130,7 @@ namespace System.Text.Json
                 case ClassType.Object:
                     {
                         CreateObject = options.MemberAccessorStrategy.CreateConstructor(type);
-                        Dictionary<string, JsonPropertyInfo> cache = new Dictionary<string, JsonPropertyInfo>(
+                        PropertyCache = new Dictionary<string, JsonPropertyInfo>(
                             Options.PropertyNameCaseInsensitive
                                 ? StringComparer.OrdinalIgnoreCase
                                 : StringComparer.Ordinal);
@@ -124,14 +158,14 @@ namespace System.Text.Json
                                     string propertyName = propertyInfo.Name;
 
                                     // The JsonPropertyNameAttribute or naming policy resulted in a collision.
-                                    if (!JsonHelpers.TryAdd(cache, jsonPropertyInfo.NameAsString, jsonPropertyInfo))
+                                    if (!JsonHelpers.TryAdd(PropertyCache, jsonPropertyInfo.NameAsString, jsonPropertyInfo))
                                     {
-                                        JsonPropertyInfo other = cache[jsonPropertyInfo.NameAsString];
+                                        JsonPropertyInfo other = PropertyCache[jsonPropertyInfo.NameAsString];
 
                                         if (other.IsIgnored)
                                         {
                                             // Overwrite previously cached property since it has [JsonIgnore].
-                                            cache[jsonPropertyInfo.NameAsString] = jsonPropertyInfo;
+                                            PropertyCache[jsonPropertyInfo.NameAsString] = jsonPropertyInfo;
                                         }
                                         else if (
                                             // Does the current property have `JsonIgnoreAttribute`?
@@ -168,39 +202,18 @@ namespace System.Text.Json
                             }
                         }
 
-                        JsonPropertyInfo[] cacheArray;
-                        if (DetermineExtensionDataProperty(cache))
+                        if (DetermineExtensionDataProperty(PropertyCache!))
                         {
                             // Remove from cache since it is handled independently.
-                            cache.Remove(DataExtensionProperty!.NameAsString);
+                            PropertyCache!.Remove(DataExtensionProperty!.NameAsString);
 
-                            cacheArray = new JsonPropertyInfo[cache.Count + 1];
+                            PropertyCacheArray = new JsonPropertyInfo[PropertyCache!.Count + 1];
 
                             // Set the last element to the extension property.
-                            cacheArray[cache.Count] = DataExtensionProperty;
-                        }
-                        else
-                        {
-                            cacheArray = new JsonPropertyInfo[cache.Count];
+                            PropertyCacheArray[PropertyCache.Count] = DataExtensionProperty;
                         }
 
-                        // Copy the dictionary cache to the array cache.
-                        cache.Values.CopyTo(cacheArray, 0);
-
-                        // Set the array cache field at this point since it is completely initialized.
-                        // It can now be safely accessed by other threads.
-                        PropertyCacheArray = cacheArray;
-
-                        // Allow constructor parameter logic to remove items from the dictionary since the JSON
-                        // property values will be passed to the constructor and do not call a property setter.
-                        if (converter.ConstructorIsParameterized)
-                        {
-                            InitializeConstructorParameters(cache, converter.ConstructorInfo!);
-                        }
-
-                        // Set the dictionary cache field at this point since it is completely initialized.
-                        // It can now be safely accessed by other threads.
-                        PropertyCache = cache;
+                        CompleteObjectInititalization();
                     }
                     break;
                 case ClassType.Enumerable:
@@ -227,7 +240,27 @@ namespace System.Text.Json
             }
         }
 
-        private void InitializeConstructorParameters(Dictionary<string, JsonPropertyInfo> propertyCache, ConstructorInfo constructorInfo)
+        internal void CompleteObjectInititalization()
+        {
+            if (PropertyCacheArray == null)
+            {
+                PropertyCacheArray = new JsonPropertyInfo[PropertyCache!.Count];
+            }
+
+            // Copy the dictionary cache to the array cache.
+            PropertyCache!.Values.CopyTo(PropertyCacheArray, 0);
+
+            JsonConverter converter = PropertyInfoForClassInfo.ConverterBase;
+
+            // Allow constructor parameter logic to remove items from the dictionary since the JSON
+            // property values will be passed to the constructor and do not call a property setter.
+            if (converter.ConstructorIsParameterized)
+            {
+                InitializeConstructorParameters(converter.ConstructorInfo!);
+            }
+        }
+
+        private void InitializeConstructorParameters(ConstructorInfo constructorInfo)
         {
             ParameterInfo[] parameters = constructorInfo!.GetParameters();
             Dictionary<string, JsonParameterInfo> parameterCache = new Dictionary<string, JsonParameterInfo>(
@@ -270,7 +303,7 @@ namespace System.Text.Json
                         parameterCache.Add(jsonPropertyInfo.NameAsString, jsonParameterInfo);
 
                         // Remove property from deserialization cache to reduce the number of JsonPropertyInfos considered during JSON matching.
-                        propertyCache.Remove(jsonPropertyInfo.NameAsString);
+                        PropertyCache!.Remove(jsonPropertyInfo.NameAsString);
 
                         isBound = true;
                         firstMatch = propertyInfo;
@@ -287,8 +320,6 @@ namespace System.Text.Json
 
             ParameterCache = parameterCache;
             ParameterCount = parameters.Length;
-
-            PropertyCache = propertyCache;
         }
 
         private static bool PropertyIsOverridenAndIgnored(PropertyInfo currentProperty, Dictionary<string, PropertyInfo>? ignoredProperties)
@@ -308,7 +339,7 @@ namespace System.Text.Json
             return propertyInfo.GetMethod?.IsVirtual == true || propertyInfo.SetMethod?.IsVirtual == true;
         }
 
-        public bool DetermineExtensionDataProperty(Dictionary<string, JsonPropertyInfo> cache)
+        internal bool DetermineExtensionDataProperty(Dictionary<string, JsonPropertyInfo> cache)
         {
             JsonPropertyInfo? jsonPropertyInfo = GetPropertyWithUniqueAttribute(Type, typeof(JsonExtensionDataAttribute), cache);
             if (jsonPropertyInfo != null)
@@ -382,7 +413,7 @@ namespace System.Text.Json
         // - runtime type,
         // - element type (if the type is a collection),
         // - the converter (either native or custom), if one exists.
-        public static JsonConverter GetConverter(
+        internal static JsonConverter GetConverter(
             Type type,
             Type? parentClassType,
             PropertyInfo? propertyInfo,

@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Text.Json.Serialization;
+
 namespace System.Text.Json
 {
     public static partial class JsonSerializer
@@ -70,6 +72,46 @@ namespace System.Text.Json
                 using (var writer = new Utf8JsonWriter(output, options.GetWriterOptions()))
                 {
                     WriteCore(writer, value, inputType, options);
+                }
+
+                return JsonReaderHelper.TranscodeHelper(output.WrittenMemory.Span);
+            }
+        }
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <typeparam name="TValue"></typeparam>
+        /// <param name="value"></param>
+        /// <param name="jsonClassInfo"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        public static string Serialize<TValue>(in TValue value, JsonClassInfo jsonClassInfo, JsonSerializerOptions? options = null)
+        {
+            if (jsonClassInfo == null)
+            {
+                throw new ArgumentNullException(nameof(jsonClassInfo));
+            }
+
+            if (options == null)
+            {
+                options = JsonSerializerOptions.s_defaultOptions;
+            }
+
+            WriteStack state = default;
+            state.Initialize(jsonClassInfo, options);
+
+            using (var output = new PooledByteBufferWriter(options.DefaultBufferSize))
+            {
+                using (var writer = new Utf8JsonWriter(output, options.GetWriterOptions()))
+                {
+                    JsonConverter? jsonConverter = jsonClassInfo.PropertyInfoForClassInfo.ConverterBase as JsonConverter<TValue>;
+                    if (jsonConverter == null)
+                    {
+                        throw new InvalidOperationException("todo: classInfo not compatible");
+                    }
+
+                    WriteCore(jsonConverter, writer, value, ref state, options);
                 }
 
                 return JsonReaderHelper.TranscodeHelper(output.WrittenMemory.Span);

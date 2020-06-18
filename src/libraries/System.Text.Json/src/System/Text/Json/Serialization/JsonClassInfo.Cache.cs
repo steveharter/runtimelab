@@ -11,13 +11,16 @@ using System.Text.Json.Serialization;
 
 namespace System.Text.Json
 {
+    /// <summary>
+    /// todo
+    /// </summary>
     [DebuggerDisplay("ClassType.{ClassType}, {Type.Name}")]
-    internal sealed partial class JsonClassInfo
+    public partial class JsonClassInfo
     {
         /// <summary>
         /// Cached typeof(object). It is faster to cache this than to call typeof(object) multiple times.
         /// </summary>
-        public static readonly Type ObjectType = typeof(object);
+        internal static readonly Type ObjectType = typeof(object);
 
         // The length of the property name embedded in the key (in bytes).
         // The key is a ulong (8 bytes) containing the first 7 bytes of the property name
@@ -32,18 +35,18 @@ namespace System.Text.Json
 
         // The number of parameters the deserialization constructor has. If this is not equal to ParameterCache.Count, this means
         // that not all parameters are bound to object properties, and an exception will be thrown if deserialization is attempted.
-        public int ParameterCount { get; private set; }
+        internal int ParameterCount { get; private set; }
 
         // All of the serializable parameters on a POCO constructor keyed on parameter name.
         // Only paramaters which bind to properties are cached.
-        public volatile Dictionary<string, JsonParameterInfo>? ParameterCache;
+        internal Dictionary<string, JsonParameterInfo>? ParameterCache;
 
         // All of the serializable properties on a POCO (except the optional extension property) keyed on property name.
-        public volatile Dictionary<string, JsonPropertyInfo>? PropertyCache;
+        internal Dictionary<string, JsonPropertyInfo>? PropertyCache;
 
         // All of the serializable properties on a POCO including the optional extension property.
         // Used for performance during serialization instead of 'PropertyCache' above.
-        public volatile JsonPropertyInfo[]? PropertyCacheArray;
+        internal JsonPropertyInfo[]? PropertyCacheArray;
 
         // Fast cache of constructor parameters by first JSON ordering; may not contain all parameters. Accessed before ParameterCache.
         // Use an array (instead of List<T>) for highest performance.
@@ -53,7 +56,53 @@ namespace System.Text.Json
         // Use an array (instead of List<T>) for highest performance.
         private volatile PropertyRef[]? _propertyRefsSorted;
 
-        public static JsonPropertyInfo AddProperty(PropertyInfo propertyInfo, Type parentClassType, JsonSerializerOptions options)
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="propertyName"></param>
+        /// <param name="getter"></param>
+        /// <param name="setter"></param>
+        /// <param name="converter"></param>
+        public JsonPropertyInfo<T> AddProperty<T>(
+            string propertyName,
+            Func<object, T>? getter,
+            Action<object, T>? setter,
+            JsonConverter<T>? converter)
+        {
+            var jsonPropertyInfo = new JsonPropertyInfo<T>();
+            if (getter != null)
+            {
+                jsonPropertyInfo.Get = getter;
+                jsonPropertyInfo.ShouldSerialize = true;
+            }
+
+            if (setter != null)
+            {
+                jsonPropertyInfo.Set = setter;
+                jsonPropertyInfo.ShouldDeserialize = true;
+            }
+
+            jsonPropertyInfo.Options = Options;
+            jsonPropertyInfo.NameAsString = propertyName;
+            jsonPropertyInfo.NameAsUtf8Bytes = Encoding.UTF8.GetBytes(propertyName);
+            jsonPropertyInfo.EscapedNameSection = JsonHelpers.GetEscapedPropertyNameSection(jsonPropertyInfo.NameAsUtf8Bytes, Options.Encoder);
+
+            if (converter != null)
+            {
+                jsonPropertyInfo.Converter = converter;
+            }
+            else
+            {
+                jsonPropertyInfo.Converter = (JsonConverter<T>)Options.GetConverter(typeof(T));
+            }
+
+            PropertyCache!.Add(jsonPropertyInfo.NameAsString, jsonPropertyInfo);
+
+            return jsonPropertyInfo;
+        }
+
+        internal static JsonPropertyInfo AddProperty(PropertyInfo propertyInfo, Type parentClassType, JsonSerializerOptions options)
         {
             JsonIgnoreCondition? ignoreCondition = JsonPropertyInfo.GetAttribute<JsonIgnoreAttribute>(propertyInfo)?.Condition;
 
@@ -131,7 +180,7 @@ namespace System.Text.Json
 
         // AggressiveInlining used although a large method it is only called from one location and is on a hot path.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JsonPropertyInfo GetProperty(
+        internal JsonPropertyInfo GetProperty(
             ReadOnlySpan<byte> propertyName,
             ref ReadStackFrame frame,
             out byte[] utf8PropertyName)
@@ -268,7 +317,7 @@ namespace System.Text.Json
 
         // AggressiveInlining used although a large method it is only called from one location and is on a hot path.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JsonParameterInfo? GetParameter(
+        internal JsonParameterInfo? GetParameter(
             ReadOnlySpan<byte> propertyName,
             ref ReadStackFrame frame,
             out byte[] utf8PropertyName)
@@ -439,7 +488,7 @@ namespace System.Text.Json
         /// </summary>
         // AggressiveInlining used since this method is only called from two locations and is on a hot path.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ulong GetKey(ReadOnlySpan<byte> propertyName)
+        internal static ulong GetKey(ReadOnlySpan<byte> propertyName)
         {
             const int BitsInByte = 8;
             ulong key;
@@ -521,7 +570,7 @@ namespace System.Text.Json
             return key;
         }
 
-        public void UpdateSortedPropertyCache(ref ReadStackFrame frame)
+        internal void UpdateSortedPropertyCache(ref ReadStackFrame frame)
         {
             Debug.Assert(frame.PropertyRefCache != null);
 
@@ -557,7 +606,7 @@ namespace System.Text.Json
             frame.PropertyRefCache = null;
         }
 
-        public void UpdateSortedParameterCache(ref ReadStackFrame frame)
+        internal void UpdateSortedParameterCache(ref ReadStackFrame frame)
         {
             Debug.Assert(frame.CtorArgumentState!.ParameterRefCache != null);
 

@@ -14,16 +14,28 @@ namespace System.Text.Json
     /// </summary>
     /// <typeparamref name="T"/> is the <see cref="JsonConverter{T}.TypeToConvert"/> for either the property's converter,
     /// or a type's converter, if the current instance is a <see cref="JsonClassInfo.PropertyInfoForClassInfo"/>.
-    internal sealed class JsonPropertyInfo<T> : JsonPropertyInfo
+    public sealed class JsonPropertyInfo<T> : JsonPropertyInfo
     {
         private static readonly T s_defaultValue = default!;
 
-        public Func<object, T>? Get { get; private set; }
-        public Action<object, T>? Set { get; private set; }
+        internal JsonPropertyInfo() { }
 
+        /// <summary>
+        /// todo
+        /// </summary>
+        public Func<object, T>? Get { get; internal set; }
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        public Action<object, T>? Set { get; internal set; }
+
+        /// <summary>
+        /// todo
+        /// </summary>
         public JsonConverter<T> Converter { get; internal set; } = null!;
 
-        public override void Initialize(
+        internal override void Initialize(
             Type parentClassType,
             Type declaredPropertyType,
             Type? runtimePropertyType,
@@ -71,6 +83,9 @@ namespace System.Text.Json
             GetPolicies(ignoreCondition);
         }
 
+        /// <summary>
+        /// todo
+        /// </summary>
         public override JsonConverter ConverterBase
         {
             get
@@ -84,7 +99,7 @@ namespace System.Text.Json
             }
         }
 
-        public override object? GetValueAsObject(object obj)
+        internal override object? GetValueAsObject(object obj)
         {
             if (IsForClassInfo)
             {
@@ -95,7 +110,7 @@ namespace System.Text.Json
             return Get!(obj);
         }
 
-        public override bool GetMemberAndWriteJson(object obj, ref WriteStack state, Utf8JsonWriter writer)
+        internal override bool GetMemberAndWriteJson(object obj, ref WriteStack state, Utf8JsonWriter writer)
         {
             bool success;
             T value = Get!(obj);
@@ -150,7 +165,7 @@ namespace System.Text.Json
             return success;
         }
 
-        public override bool GetMemberAndWriteJsonExtensionData(object obj, ref WriteStack state, Utf8JsonWriter writer)
+        internal override bool GetMemberAndWriteJsonExtensionData(object obj, ref WriteStack state, Utf8JsonWriter writer)
         {
             bool success;
             T value = Get!(obj);
@@ -167,7 +182,7 @@ namespace System.Text.Json
             return success;
         }
 
-        public override bool ReadJsonAndSetMember(object obj, ref ReadStack state, ref Utf8JsonReader reader)
+        internal override bool ReadJsonAndSetMember(object obj, ref ReadStack state, ref Utf8JsonReader reader)
         {
             bool success;
 
@@ -216,7 +231,7 @@ namespace System.Text.Json
             return success;
         }
 
-        public override bool ReadJsonAsObject(ref ReadStack state, ref Utf8JsonReader reader, out object? value)
+        internal override bool ReadJsonAsObject(ref ReadStack state, ref Utf8JsonReader reader, out object? value)
         {
             bool success;
             bool isNullToken = reader.TokenType == JsonTokenType.Null;
@@ -248,11 +263,79 @@ namespace System.Text.Json
             return success;
         }
 
-        public override void SetExtensionDictionaryAsObject(object obj, object? extensionDict)
+        internal override void SetExtensionDictionaryAsObject(object obj, object? extensionDict)
         {
             Debug.Assert(HasSetter);
             T typedValue = (T)extensionDict!;
             Set!(obj, typedValue);
+        }
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <param name="value"></param>
+        /// <param name="state"></param>
+        /// <param name="writer"></param>
+        public void WriteObject(object obj, in T value, ref WriteStack state, Utf8JsonWriter writer)
+        {
+            if (value == null)
+            {
+                Debug.Assert(s_defaultValue == null && Converter.CanBeNull);
+
+                if (!IgnoreDefaultValuesOnWrite)
+                {
+                    if (!Converter.HandleNull)
+                    {
+                        writer.WriteNullSection(EscapedNameSection);
+                    }
+                    else
+                    {
+                        // No object, collection, or re-entrancy converter handles null.
+                        Debug.Assert(Converter.ClassType == ClassType.Value);
+                        writer.WritePropertyNameSection(EscapedNameSection);
+
+                        int originalDepth = writer.CurrentDepth;
+                        Converter.Write(writer, value, Options);
+                        if (originalDepth != writer.CurrentDepth)
+                        {
+                            ThrowHelper.ThrowJsonException_SerializationConverterWrite(Converter);
+                        }
+                    }
+                }
+            }
+            else if (IgnoreDefaultValuesOnWrite && Converter._defaultComparer.Equals(s_defaultValue, value))
+            {
+                Debug.Assert(s_defaultValue != null && !Converter.CanBeNull);
+            }
+            else
+            {
+                writer.WritePropertyNameSection(EscapedNameSection);
+                if (!Converter.TryWrite(writer, value, Options, ref state))
+                {
+                    throw new InvalidOperationException("todo: converter returned false");
+                }
+            }
+        }
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="writer"></param>
+        public void WriteValue(in T value, Utf8JsonWriter writer)
+        {
+            if (IgnoreDefaultValuesOnWrite && Converter._defaultComparer.Equals(s_defaultValue, value))
+            {
+                Debug.Assert(s_defaultValue != null && !Converter.CanBeNull);
+            }
+            else
+            {
+                // It should not be possible to get a JsonException coming from the converter or writer
+                // so no need to set state.JsonPropertyNameAsString.
+                writer.WritePropertyNameSection(EscapedNameSection);
+                Converter.Write(writer, value, Options);
+            }
         }
     }
 }

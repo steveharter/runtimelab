@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using System.Text.Encodings.Web;
+using System.Text.Json.Serialization.Converters;
 
 namespace System.Text.Json
 {
@@ -49,7 +50,7 @@ namespace System.Text.Json
         /// </summary>
         public JsonSerializerOptions()
         {
-            Converters = new ConverterList(this);
+            Converters = new JsonConverters(this);
         }
 
         /// <summary>
@@ -82,7 +83,7 @@ namespace System.Text.Json
             _propertyNameCaseInsensitive = options._propertyNameCaseInsensitive;
             _writeIndented = options._writeIndented;
 
-            Converters = new ConverterList(this, (ConverterList)options.Converters);
+            Converters = new JsonConverters(this, (JsonConverters)options.Converters);
             EffectiveMaxDepth = options.EffectiveMaxDepth;
 
             // _classes is not copied as sharing the JsonClassInfo and JsonPropertyInfo caches can result in
@@ -106,6 +107,41 @@ namespace System.Text.Json
             {
                 throw new ArgumentOutOfRangeException(nameof(defaults));
             }
+        }
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="jsonClassInfo"></param>
+        public void AddClassInfo(JsonClassInfo jsonClassInfo)
+        {
+            if (jsonClassInfo.Options != this)
+            {
+                throw new ArgumentException("todo: options incorrect");
+            }
+
+            jsonClassInfo.CompleteObjectInititalization();
+
+            //todo: _classes.IsImmutable = true;
+            _classes.TryAdd(jsonClassInfo.Type, jsonClassInfo);
+
+            // Ignore if already added
+        }
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        public JsonClassInfo CreateClassInfo<T>(JsonClassInfo.SerializeDelegate serializeFunc) where T : notnull
+        {
+            if (serializeFunc == null)
+            {
+                throw new ArgumentNullException(nameof(serializeFunc));
+            }
+
+            Type type = typeof(T);
+            JsonClassInfo classInfo = new JsonClassInfo(type, this);
+            JsonConverter converter = new ObjectCodeGenConverter<T>();
+            return new JsonClassInfo(type, converter, serializeFunc, this);
         }
 
         /// <summary>
@@ -445,6 +481,7 @@ namespace System.Text.Json
             // https://github.com/dotnet/runtime/issues/32357
             if (!_classes.TryGetValue(type, out JsonClassInfo? result))
             {
+                JsonClassInfo jsonClassInfo = new JsonClassInfo(type, this);
                 result = _classes.GetOrAdd(type, new JsonClassInfo(type, this));
             }
 

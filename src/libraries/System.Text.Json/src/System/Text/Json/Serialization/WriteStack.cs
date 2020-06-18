@@ -8,8 +8,11 @@ using System.Text.Json.Serialization;
 
 namespace System.Text.Json
 {
+    /// <summary>
+    /// todo
+    /// </summary>
     [DebuggerDisplay("Path:{PropertyPath()} Current: ClassType.{Current.JsonClassInfo.ClassType}, {Current.JsonClassInfo.Type.Name}")]
-    internal struct WriteStack
+    public struct WriteStack
     {
         /// <summary>
         /// The number of stack frames when the continuation started.
@@ -24,23 +27,23 @@ namespace System.Text.Json
         private List<WriteStackFrame> _previous;
 
         // A field is used instead of a property to avoid value semantics.
-        public WriteStackFrame Current;
+        internal WriteStackFrame Current;
 
         /// <summary>
         /// The amount of bytes to write before the underlying Stream should be flushed and the
         /// current buffer adjusted to remove the processed bytes.
         /// </summary>
-        public int FlushThreshold;
+        internal int FlushThreshold;
 
-        public bool IsContinuation => _continuationCount != 0;
+        internal bool IsContinuation => _continuationCount != 0;
 
         // The bag of preservable references.
-        public ReferenceResolver ReferenceResolver;
+        internal ReferenceResolver ReferenceResolver;
 
         /// <summary>
         /// Internal flag to let us know that we need to read ahead in the inner read loop.
         /// </summary>
-        public bool SupportContinuation;
+        internal bool SupportContinuation;
 
         private void AddCurrent()
         {
@@ -66,7 +69,7 @@ namespace System.Text.Json
         /// <summary>
         /// Initialize the state without delayed initialization of the JsonClassInfo.
         /// </summary>
-        public JsonConverter Initialize(Type type, JsonSerializerOptions options, bool supportContinuation)
+        internal JsonConverter Initialize(Type type, JsonSerializerOptions options, bool supportContinuation)
         {
             JsonClassInfo jsonClassInfo = options.GetOrAddClassForRootType(type);
             Current.JsonClassInfo = jsonClassInfo;
@@ -86,7 +89,25 @@ namespace System.Text.Json
             return jsonClassInfo.PropertyInfoForClassInfo.ConverterBase;
         }
 
-        public void Push()
+        /// <summary>
+        /// Initialize the state without delayed initialization of the JsonClassInfo.
+        /// </summary>
+        internal void Initialize(JsonClassInfo jsonClassInfo, JsonSerializerOptions options)
+        {
+            Current.JsonClassInfo = jsonClassInfo;
+
+            if ((jsonClassInfo.ClassType & (ClassType.Enumerable | ClassType.Dictionary)) == 0)
+            {
+                Current.DeclaredJsonPropertyInfo = jsonClassInfo.PropertyInfoForClassInfo;
+            }
+
+            if (options.ReferenceHandler != null)
+            {
+                ReferenceResolver = options.ReferenceHandler!.CreateResolver(writing: true);
+            }
+        }
+
+        internal void Push()
         {
             if (_continuationCount == 0)
             {
@@ -129,7 +150,7 @@ namespace System.Text.Json
             }
         }
 
-        public void Pop(bool success)
+        internal void Pop(bool success)
         {
             Debug.Assert(_count > 0);
 
@@ -179,9 +200,12 @@ namespace System.Text.Json
             }
         }
 
-        // Return a property path as a simple JSONPath using dot-notation when possible. When special characters are present, bracket-notation is used:
-        // $.x.y.z
-        // $['PropertyName.With.Special.Chars']
+        /// <summary>
+        /// Return a property path as a simple JSONPath using dot-notation when possible. When special characters are present, bracket-notation is used:
+        /// $.x.y.z
+        /// $['PropertyName.With.Special.Chars']
+        /// </summary>
+        /// <returns></returns>
         public string PropertyPath()
         {
             StringBuilder sb = new StringBuilder("$");
