@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json
 {
@@ -84,22 +85,18 @@ namespace System.Text.Json
         /// <typeparam name="TValue"></typeparam>
         /// <param name="value"></param>
         /// <param name="jsonClassInfo"></param>
-        /// <param name="options"></param>
         /// <returns></returns>
-        public static string Serialize<TValue>(in TValue value, JsonClassInfo jsonClassInfo, JsonSerializerOptions? options = null)
+        public static string Serialize<TValue>(in TValue value, JsonTypeInfo<TValue> jsonClassInfo)
         {
             if (jsonClassInfo == null)
             {
                 throw new ArgumentNullException(nameof(jsonClassInfo));
             }
 
-            if (options == null)
-            {
-                options = JsonSerializerOptions.s_defaultOptions;
-            }
-
             WriteStack state = default;
-            state.Initialize(jsonClassInfo, options);
+            state.Initialize(jsonClassInfo);
+
+            JsonSerializerOptions options = jsonClassInfo.Options;
 
             using (var output = new PooledByteBufferWriter(options.DefaultBufferSize))
             {

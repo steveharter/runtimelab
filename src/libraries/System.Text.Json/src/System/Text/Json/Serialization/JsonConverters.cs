@@ -72,6 +72,7 @@ namespace System.Text.Json.Serialization
             }
 
             _options.VerifyMutable();
+
             _list.Add(item);
         }
 
@@ -167,40 +168,6 @@ namespace System.Text.Json.Serialization
         IEnumerator IEnumerable.GetEnumerator()
         {
             return _list.GetEnumerator();
-        }
-
-        private JsonConverter<string?> _stringConverter = null!;
-        /// <summary>
-        /// todo
-        /// </summary>
-        public JsonConverter<string?> StringConverter
-        {
-            get
-            {
-                if (_stringConverter == null)
-                {
-                    _stringConverter = new StringConverter();
-                }
-
-                return _stringConverter;
-            }
-        }
-
-        private JsonConverter<int> _intConverter = null!;
-        /// <summary>
-        /// todo
-        /// </summary>
-        public JsonConverter<int> Int32Converter
-        {
-            get
-            {
-                if (_stringConverter == null)
-                {
-                    _intConverter = new Int32Converter();
-                }
-
-                return _intConverter;
-            }
         }
     }
 }

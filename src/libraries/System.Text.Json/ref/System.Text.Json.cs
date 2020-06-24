@@ -7,14 +7,6 @@
 
 namespace System.Text.Json
 {
-    public sealed partial class JsonClassInfo
-    {
-        internal JsonClassInfo() { }
-        public System.Text.Json.JsonSerializerOptions Options { get { throw null; } }
-        public System.Type Type { get { throw null; } }
-        public System.Text.Json.JsonPropertyInfo<T> AddProperty<T>(string propertyName, System.Func<object, T>? getter, System.Action<object, T>? setter, System.Text.Json.Serialization.JsonConverter<T>? converter) { throw null; }
-        public delegate void SerializeDelegate(System.Text.Json.Utf8JsonWriter writer, object value, ref System.Text.Json.WriteStack writeStack, System.Text.Json.JsonSerializerOptions options);
-    }
     public enum JsonCommentHandling : byte
     {
         Disallow = (byte)0,
@@ -177,27 +169,6 @@ namespace System.Text.Json
         public override string ToString() { throw null; }
         public void WriteTo(System.Text.Json.Utf8JsonWriter writer) { }
     }
-    public abstract partial class JsonPropertyInfo
-    {
-        internal JsonPropertyInfo() { }
-        public byte[] EscapedNameSection;
-        public byte[] NameAsUtf8Bytes;
-        public abstract System.Text.Json.Serialization.JsonConverter ConverterBase { get; set; }
-        public System.Type DeclaredPropertyType { get { throw null; } }
-        public string NameAsString { get { throw null; } }
-        public bool ShouldDeserialize { get { throw null; } }
-        public bool ShouldSerialize { get { throw null; } }
-    }
-    public sealed partial class JsonPropertyInfo<T> : System.Text.Json.JsonPropertyInfo
-    {
-        internal JsonPropertyInfo() { }
-        public System.Text.Json.Serialization.JsonConverter<T> Converter { get { throw null; } }
-        public override System.Text.Json.Serialization.JsonConverter ConverterBase { get { throw null; } set { } }
-        public System.Func<object, T>? Get { get { throw null; } }
-        public System.Action<object, T>? Set { get { throw null; } }
-        public void WriteObject(object obj, in T value, ref System.Text.Json.WriteStack state, System.Text.Json.Utf8JsonWriter writer) { }
-        public void WriteValue(in T value, System.Text.Json.Utf8JsonWriter writer) { }
-    }
     public partial struct JsonReaderOptions
     {
         private int _dummyPrimitive;
@@ -224,6 +195,8 @@ namespace System.Text.Json
         [return: System.Diagnostics.CodeAnalysis.MaybeNullAttribute]
         public static TValue Deserialize<TValue>(string json, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
         [return: System.Diagnostics.CodeAnalysis.MaybeNullAttribute]
+        public static TValue Deserialize<TValue>(string json, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TValue> jsonClassInfo) { throw null; }
+        [return: System.Diagnostics.CodeAnalysis.MaybeNullAttribute]
         public static TValue Deserialize<TValue>(ref System.Text.Json.Utf8JsonReader reader, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
         public static string Serialize(object? value, System.Type inputType, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
         public static void Serialize(System.Text.Json.Utf8JsonWriter writer, object? value, System.Type inputType, System.Text.Json.JsonSerializerOptions? options = null) { }
@@ -231,10 +204,10 @@ namespace System.Text.Json
         public static System.Threading.Tasks.Task SerializeAsync<TValue>(System.IO.Stream utf8Json, TValue value, System.Text.Json.JsonSerializerOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) { throw null; }
         public static byte[] SerializeToUtf8Bytes(object? value, System.Type inputType, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
         public static byte[] SerializeToUtf8Bytes<TValue>(TValue value, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
-        public static void Serialize<TValue>(System.Text.Json.Utf8JsonWriter writer, TValue value, System.Text.Json.JsonClassInfo jsonClassInfo, ref System.Text.Json.WriteStack state, System.Text.Json.JsonSerializerOptions? options = null) { }
         public static void Serialize<TValue>(System.Text.Json.Utf8JsonWriter writer, TValue value, System.Text.Json.JsonSerializerOptions? options = null) { }
+        public static void Serialize<TValue>(System.Text.Json.Utf8JsonWriter writer, TValue value, System.Text.Json.Serialization.Metadata.JsonClassInfo jsonClassInfo, ref System.Text.Json.WriteStack state, System.Text.Json.JsonSerializerOptions? options = null) { }
         public static string Serialize<TValue>(TValue value, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
-        public static string Serialize<TValue>(in TValue value, System.Text.Json.JsonClassInfo jsonClassInfo, System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
+        public static string Serialize<TValue>(in TValue value, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TValue> jsonClassInfo) { throw null; }
     }
     public enum JsonSerializerDefaults
     {
@@ -260,8 +233,6 @@ namespace System.Text.Json
         public System.Text.Json.JsonCommentHandling ReadCommentHandling { get { throw null; } set { } }
         public System.Text.Json.Serialization.ReferenceHandler? ReferenceHandler { get { throw null; } set { } }
         public bool WriteIndented { get { throw null; } set { } }
-        public void AddClassInfo(System.Text.Json.JsonClassInfo jsonClassInfo) { }
-        public System.Text.Json.JsonClassInfo CreateClassInfo<T>(System.Text.Json.JsonClassInfo.SerializeDelegate serializeFunc) where T : notnull { throw null; }
         public System.Text.Json.Serialization.JsonConverter GetConverter(System.Type typeToConvert) { throw null; }
     }
     public enum JsonTokenType : byte
@@ -540,10 +511,8 @@ namespace System.Text.Json.Serialization
     {
         internal JsonConverters() { }
         public int Count { get { throw null; } }
-        public System.Text.Json.Serialization.JsonConverter<int> Int32Converter { get { throw null; } }
         public bool IsReadOnly { get { throw null; } }
         public System.Text.Json.Serialization.JsonConverter this[int index] { get { throw null; } set { } }
-        public System.Text.Json.Serialization.JsonConverter<string?> StringConverter { get { throw null; } }
         public void Add(System.Text.Json.Serialization.JsonConverter item) { }
         public void Clear() { }
         public bool Contains(System.Text.Json.Serialization.JsonConverter item) { throw null; }
@@ -592,6 +561,17 @@ namespace System.Text.Json.Serialization
         public JsonPropertyNameAttribute(string name) { }
         public string Name { get { throw null; } }
     }
+    public partial class JsonSerializerContext : System.IDisposable
+    {
+        public JsonSerializerContext() { }
+        public JsonSerializerContext(System.Text.Json.JsonSerializerOptions options) { }
+        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<bool> Boolean { get { throw null; } }
+        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<int> Int32 { get { throw null; } }
+        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<string?> String { get { throw null; } }
+        public void Dispose() { }
+        protected virtual void Dispose(bool disposing) { }
+        public System.Text.Json.JsonSerializerOptions? GetOptions() { throw null; }
+    }
     public sealed partial class JsonStringEnumConverter : System.Text.Json.Serialization.JsonConverterFactory
     {
         public JsonStringEnumConverter() { }
@@ -616,5 +596,82 @@ namespace System.Text.Json.Serialization
         public abstract void AddReference(string referenceId, object value);
         public abstract string GetReference(object value, out bool alreadyExists);
         public abstract object ResolveReference(string referenceId);
+    }
+}
+namespace System.Text.Json.Serialization.Converters
+{
+    public sealed partial class Int32Converter : System.Text.Json.Serialization.JsonConverter<int>
+    {
+        public Int32Converter() { }
+        public override int Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, int value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+    public sealed partial class StringConverter : System.Text.Json.Serialization.JsonConverter<string?>
+    {
+        public StringConverter() { }
+        public override string? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, string? value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+}
+namespace System.Text.Json.Serialization.Metadata
+{
+    public partial class JsonClassInfo
+    {
+        internal JsonClassInfo() { }
+        public System.Text.Json.Serialization.JsonConverter ConverterBase { get { throw null; } }
+        public System.Text.Json.Serialization.Metadata.JsonClassInfo.ConstructorDelegate? CreateObject { get { throw null; } set { } }
+        public System.Text.Json.Serialization.Metadata.JsonClassInfo.DeserializeDelegate? Deserialize { get { throw null; } set { } }
+        public System.Text.Json.JsonSerializerOptions Options { get { throw null; } }
+        public System.Text.Json.Serialization.Metadata.JsonClassInfo.SerializeDelegate? Serialize { get { throw null; } set { } }
+        public System.Type Type { get { throw null; } }
+        public delegate object? ConstructorDelegate();
+        public delegate object DeserializeDelegate(ref System.Text.Json.Utf8JsonReader reader, ref System.Text.Json.ReadStack readStack, System.Text.Json.JsonSerializerOptions options);
+        public delegate void SerializeDelegate(System.Text.Json.Utf8JsonWriter writer, object value, ref System.Text.Json.WriteStack writeStack, System.Text.Json.JsonSerializerOptions options);
+    }
+    public sealed partial class JsonCollectionTypeInfo<T> : System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>
+    {
+        public JsonCollectionTypeInfo(System.Text.Json.Serialization.Metadata.JsonClassInfo.ConstructorDelegate createObjectFunc, System.Text.Json.Serialization.JsonConverter<T> converter, System.Text.Json.Serialization.Metadata.JsonClassInfo elementInfo, System.Text.Json.JsonSerializerOptions? options) { }
+        public void CompleteInitialization() { }
+    }
+    public sealed partial class JsonObjectInfo<T> : System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>
+    {
+        public JsonObjectInfo(System.Text.Json.Serialization.Metadata.JsonClassInfo.ConstructorDelegate createObjectFunc, System.Text.Json.Serialization.Metadata.JsonClassInfo.SerializeDelegate serializeFunc, System.Text.Json.Serialization.Metadata.JsonClassInfo.DeserializeDelegate deserializeFunc, System.Text.Json.JsonSerializerOptions? options) { }
+        public System.Text.Json.Serialization.Metadata.JsonPropertyInfo<TProperty> AddProperty<TProperty>(string propertyName, System.Func<object, TProperty>? getter, System.Action<object, TProperty>? setter, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TProperty> classInfo) { throw null; }
+        public void CompleteInitialization() { }
+    }
+    public abstract partial class JsonPropertyInfo
+    {
+        internal JsonPropertyInfo() { }
+        public byte[] EscapedNameSection;
+        public byte[] NameAsUtf8Bytes;
+        public abstract System.Text.Json.Serialization.JsonConverter ConverterBase { get; set; }
+        public System.Type DeclaredPropertyType { get { throw null; } }
+        public string NameAsString { get { throw null; } }
+        public bool ShouldDeserialize { get { throw null; } }
+        public bool ShouldSerialize { get { throw null; } }
+    }
+    public sealed partial class JsonPropertyInfo<T> : System.Text.Json.Serialization.Metadata.JsonPropertyInfo
+    {
+        internal JsonPropertyInfo() { }
+        public System.Text.Json.Serialization.JsonConverter<T> Converter { get { throw null; } }
+        public override System.Text.Json.Serialization.JsonConverter ConverterBase { get { throw null; } set { } }
+        public System.Func<object, T>? Get { get { throw null; } }
+        public System.Action<object, T>? Set { get { throw null; } }
+        public void ReadValueAndSetMember(ref System.Text.Json.Utf8JsonReader reader, ref System.Text.Json.ReadStack state, object obj) { }
+        public void WriteObject(in T value, ref System.Text.Json.WriteStack state, System.Text.Json.Utf8JsonWriter writer) { }
+        public void WriteValue(in T value, System.Text.Json.Utf8JsonWriter writer) { }
+    }
+    public abstract partial class JsonTypeInfo<T> : System.Text.Json.Serialization.Metadata.JsonClassInfo
+    {
+        internal JsonTypeInfo() { }
+    }
+    public sealed partial class JsonValueInfo<T> : System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>
+    {
+        public JsonValueInfo(System.Text.Json.Serialization.JsonConverter<T> converter, System.Text.Json.JsonSerializerOptions? options) { }
+        public void CompleteInitialization() { }
+    }
+    public static partial class KnownCollectionTypeInfos<T>
+    {
+        public static System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.List<T>> GetList(System.Text.Json.Serialization.Metadata.JsonClassInfo elementInfo, System.Text.Json.Serialization.JsonSerializerContext context) { throw null; }
     }
 }

@@ -9,7 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 
-namespace System.Text.Json
+namespace System.Text.Json.Serialization.Metadata
 {
     /// <summary>
     /// todo
@@ -55,52 +55,6 @@ namespace System.Text.Json
         // Fast cache of properties by first JSON ordering; may not contain all properties. Accessed before PropertyCache.
         // Use an array (instead of List<T>) for highest performance.
         private volatile PropertyRef[]? _propertyRefsSorted;
-
-        /// <summary>
-        /// todo
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="propertyName"></param>
-        /// <param name="getter"></param>
-        /// <param name="setter"></param>
-        /// <param name="converter"></param>
-        public JsonPropertyInfo<T> AddProperty<T>(
-            string propertyName,
-            Func<object, T>? getter,
-            Action<object, T>? setter,
-            JsonConverter<T>? converter)
-        {
-            var jsonPropertyInfo = new JsonPropertyInfo<T>();
-            if (getter != null)
-            {
-                jsonPropertyInfo.Get = getter;
-                jsonPropertyInfo.ShouldSerialize = true;
-            }
-
-            if (setter != null)
-            {
-                jsonPropertyInfo.Set = setter;
-                jsonPropertyInfo.ShouldDeserialize = true;
-            }
-
-            jsonPropertyInfo.Options = Options;
-            jsonPropertyInfo.NameAsString = propertyName;
-            jsonPropertyInfo.NameAsUtf8Bytes = Encoding.UTF8.GetBytes(propertyName);
-            jsonPropertyInfo.EscapedNameSection = JsonHelpers.GetEscapedPropertyNameSection(jsonPropertyInfo.NameAsUtf8Bytes, Options.Encoder);
-
-            if (converter != null)
-            {
-                jsonPropertyInfo.Converter = converter;
-            }
-            else
-            {
-                jsonPropertyInfo.Converter = (JsonConverter<T>)Options.GetConverter(typeof(T));
-            }
-
-            PropertyCache!.Add(jsonPropertyInfo.NameAsString, jsonPropertyInfo);
-
-            return jsonPropertyInfo;
-        }
 
         internal static JsonPropertyInfo AddProperty(PropertyInfo propertyInfo, Type parentClassType, JsonSerializerOptions options)
         {

@@ -5,6 +5,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json
 {
@@ -72,6 +73,11 @@ namespace System.Text.Json
         internal JsonConverter Initialize(Type type, JsonSerializerOptions options, bool supportContinuation)
         {
             JsonClassInfo jsonClassInfo = options.GetOrAddClassForRootType(type);
+            return Initialize(jsonClassInfo, options, supportContinuation);
+        }
+
+        private JsonConverter Initialize(JsonClassInfo jsonClassInfo, JsonSerializerOptions options, bool supportContinuation)
+        {
             Current.JsonClassInfo = jsonClassInfo;
 
             if ((jsonClassInfo.ClassType & (ClassType.Enumerable | ClassType.Dictionary)) == 0)
@@ -89,10 +95,11 @@ namespace System.Text.Json
             return jsonClassInfo.PropertyInfoForClassInfo.ConverterBase;
         }
 
+
         /// <summary>
         /// Initialize the state without delayed initialization of the JsonClassInfo.
         /// </summary>
-        internal void Initialize(JsonClassInfo jsonClassInfo, JsonSerializerOptions options)
+        internal void Initialize(JsonClassInfo jsonClassInfo)
         {
             Current.JsonClassInfo = jsonClassInfo;
 
@@ -101,6 +108,7 @@ namespace System.Text.Json
                 Current.DeclaredJsonPropertyInfo = jsonClassInfo.PropertyInfoForClassInfo;
             }
 
+            JsonSerializerOptions options = jsonClassInfo.Options;
             if (options.ReferenceHandler != null)
             {
                 ReferenceResolver = options.ReferenceHandler!.CreateResolver(writing: true);

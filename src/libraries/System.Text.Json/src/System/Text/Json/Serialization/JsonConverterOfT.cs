@@ -5,7 +5,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json.Serialization
 {
@@ -70,11 +70,6 @@ namespace System.Text.Json.Serialization
         /// Can <see langword="null"/> be assigned to <see cref="TypeToConvert"/>?
         /// </summary>
         internal bool CanBeNull { get; }
-
-        /// <summary>
-        /// Is the converter built-in.
-        /// </summary>
-        internal bool IsInternalConverter { get; set; }
 
         internal readonly EqualityComparer<T> _defaultComparer = EqualityComparer<T>.Default;
 

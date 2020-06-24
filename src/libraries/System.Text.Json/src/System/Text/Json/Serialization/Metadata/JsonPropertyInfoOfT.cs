@@ -4,10 +4,8 @@
 
 using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 
-namespace System.Text.Json
+namespace System.Text.Json.Serialization.Metadata
 {
     /// <summary>
     /// Represents a strongly-typed property to prevent boxing and to create a direct delegate to the getter\setter.
@@ -231,6 +229,41 @@ namespace System.Text.Json
             return success;
         }
 
+        /// <summary>
+        /// todo. Also call this for value converters for non-delegate case?
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="state"></param>
+        /// <param name="obj"></param>
+        public void ReadValueAndSetMember(ref Utf8JsonReader reader, ref ReadStack state, object obj)
+        {
+            bool isNullToken = reader.TokenType == JsonTokenType.Null;
+            if (isNullToken && !Converter.HandleNull)
+            {
+                if (!Converter.CanBeNull)
+                {
+                    ThrowHelper.ThrowJsonException_DeserializeUnableToConvertValue(Converter.TypeToConvert);
+                }
+
+                Debug.Assert(s_defaultValue == null);
+
+                if (!IgnoreDefaultValuesOnRead)
+                {
+                    T value = default;
+                    Set!(obj, value!);
+                }
+            }
+            else if (!isNullToken || !IgnoreDefaultValuesOnRead || !Converter.CanBeNull)
+            {
+                // Support JsonPath in exceptions.
+                state.Current.JsonPropertyInfo = this;
+
+                // Optimize for value converters by avoiding the extra call to TryRead.
+                T value = Converter.Read(ref reader, RuntimePropertyType!, Options);
+                Set!(obj, value!);
+            }
+        }
+
         internal override bool ReadJsonAsObject(ref ReadStack state, ref Utf8JsonReader reader, out object? value)
         {
             bool success;
@@ -273,11 +306,10 @@ namespace System.Text.Json
         /// <summary>
         /// todo
         /// </summary>
-        /// <param name="obj"></param>
         /// <param name="value"></param>
         /// <param name="state"></param>
         /// <param name="writer"></param>
-        public void WriteObject(object obj, in T value, ref WriteStack state, Utf8JsonWriter writer)
+        public void WriteObject(in T value, ref WriteStack state, Utf8JsonWriter writer)
         {
             if (value == null)
             {

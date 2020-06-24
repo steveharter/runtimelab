@@ -6,6 +6,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json.Serialization.Converters
 {
@@ -13,7 +14,7 @@ namespace System.Text.Json.Serialization.Converters
     /// Implementation of <cref>JsonObjectConverter{T}</cref> that supports the deserialization
     /// of JSON objects using parameterized constructors.
     /// </summary>
-    internal sealed class ObjectCodeGenConverter<T> : ObjectDefaultConverter<T> where T : notnull
+    internal sealed class ObjectCodeGenConverter<T> : ObjectDefaultConverter<T>
     {
         internal override bool OnTryRead(
             ref Utf8JsonReader reader,
@@ -22,10 +23,25 @@ namespace System.Text.Json.Serialization.Converters
             ref ReadStack state,
             [MaybeNullWhen(false)] out T value)
         {
-            //if (state.FastPath)
+            if (!state.UseFastPath)
             {
                 return base.OnTryRead(ref reader, typeToConvert, options, ref state, out value);
             }
+
+            JsonClassInfo jsonClassInfo = state.Current.JsonClassInfo;
+            Debug.Assert(jsonClassInfo.Deserialize != null);
+
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                ThrowHelper.ThrowJsonException_DeserializeUnableToConvertValue(TypeToConvert);
+            }
+
+            object objValue = jsonClassInfo.Deserialize!(ref reader, ref state, jsonClassInfo.Options);
+
+            Debug.Assert(objValue is T);
+            value = (T)objValue;
+
+            return true;
         }
 
         internal override bool OnTryWrite(
@@ -43,7 +59,7 @@ namespace System.Text.Json.Serialization.Converters
             Debug.Assert(jsonClassInfo.Serialize != null);
 
             writer.WriteStartObject();
-            jsonClassInfo.Serialize(writer, value, ref state, options);
+            jsonClassInfo.Serialize(writer, value!, ref state, options);
             writer.WriteEndObject();
 
             return true;

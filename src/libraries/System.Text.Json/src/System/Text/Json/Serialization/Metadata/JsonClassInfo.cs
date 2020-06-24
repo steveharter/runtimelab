@@ -4,19 +4,23 @@
 
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Converters;
 
-namespace System.Text.Json
+namespace System.Text.Json.Serialization.Metadata
 {
     [DebuggerDisplay("ClassType.{ClassType}, {Type.Name}")]
-    public sealed partial class JsonClassInfo
+    // todo: add JsonObjectInfo and JsonArrayInfo classes deriving from JsonClassInfo
+    // also add a sealed version of these for internal use (JsonObjectInfoInternal JsonClassInfoInternal)
+    public partial class JsonClassInfo
     {
+        internal bool _isInitialized = false;
         // todo: add immutable checks in all setters like we do in JsonSerializerOptions
 
-        internal delegate object? ConstructorDelegate();
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <returns></returns>
+        public delegate object? ConstructorDelegate();
 
         internal delegate T ParameterizedConstructorDelegate<T>(object[] arguments);
 
@@ -31,9 +35,78 @@ namespace System.Text.Json
         /// <param name="options"></param>
         public delegate void SerializeDelegate(Utf8JsonWriter writer, object value, ref WriteStack writeStack, JsonSerializerOptions options);
 
-        internal ConstructorDelegate? CreateObject { get; private set; }
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="readStack"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        public delegate object DeserializeDelegate(ref Utf8JsonReader reader, ref ReadStack readStack, JsonSerializerOptions options);
 
-        internal SerializeDelegate? Serialize { get; private set; }
+        private ConstructorDelegate? _createObject;
+        /// <summary>
+        /// todo
+        /// </summary>
+        public ConstructorDelegate? CreateObject
+        {
+            get
+            {
+                return _createObject;
+            }
+            set
+            {
+                if (_isInitialized)
+                {
+                    throw new InvalidOperationException("todo");
+                }
+
+                _createObject = value;
+            }
+        }
+
+        private SerializeDelegate? _serialize;
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        public SerializeDelegate? Serialize
+        {
+            get
+            {
+                return _serialize;
+            }
+            set
+            {
+                if (_isInitialized)
+                {
+                    throw new InvalidOperationException("todo");
+                }
+
+                _serialize = value;
+            }
+        }
+
+        private DeserializeDelegate? _deserialize;
+        /// <summary>
+        /// todo
+        /// </summary>
+        public DeserializeDelegate? Deserialize
+        {
+            get
+            {
+                return _deserialize;
+            }
+            set
+            {
+                if (_isInitialized)
+                {
+                    throw new InvalidOperationException("todo");
+                }
+
+                _deserialize = value;
+            }
+        }
 
         internal object? CreateObjectWithArgs { get; set; }
 
@@ -43,6 +116,11 @@ namespace System.Text.Json
 
         // If enumerable, the JsonClassInfo for the element type.
         private JsonClassInfo? _elementClassInfo;
+
+        /// <summary>
+        /// todo
+        /// </summary>
+        public JsonConverter ConverterBase { get; internal set; }
 
         /// <summary>
         /// Return the JsonClassInfo for the element type, or null if the type is not an enumerable or dictionary.
@@ -64,6 +142,12 @@ namespace System.Text.Json
                 }
 
                 return _elementClassInfo;
+            }
+            set
+            {
+                // Used with code-gen scenarios.
+                Debug.Assert(_elementClassInfo == null);
+                _elementClassInfo = value;
             }
         }
 
@@ -95,22 +179,37 @@ namespace System.Text.Json
         /// ClassInfo (for the cases mentioned above). In addition, methods that have a JsonPropertyInfo argument would also likely
         /// need to add an argument for JsonClassInfo.
         /// </remarks>
-        internal JsonPropertyInfo PropertyInfoForClassInfo { get; private set; }
+        internal JsonPropertyInfo PropertyInfoForClassInfo { get; set; }
 
-        internal JsonClassInfo(
-            Type type,
-            JsonConverter converter,
-            SerializeDelegate serializeFunc,
-            JsonSerializerOptions options)
+        internal JsonClassInfo(Type type, JsonSerializerOptions? options, ClassType classType)
         {
-            Options = options;
             Type = type;
-            PropertyCache = new Dictionary<string, JsonPropertyInfo>();
-            PropertyInfoForClassInfo = CreatePropertyInfoForClassInfo(type, type, converter, options);
-            Serialize = serializeFunc;
+
+            if (options == null)
+            {
+                options = JsonSerializerOptions.s_defaultOptions;
+            }
+
+            Options = options;
+
+            // todo: fix up nullability to avoid this.
+            PropertyInfoForClassInfo = null!;
+            ConverterBase = null!;
+
+            if (classType == ClassType.Object)
+            {
+                PropertyCache = new Dictionary<string, JsonPropertyInfo>(
+                    Options.PropertyNameCaseInsensitive
+                        ? StringComparer.OrdinalIgnoreCase
+                        : StringComparer.Ordinal);
+            }
+            else
+            {
+                Debug.Assert(classType == ClassType.Value);
+            }
         }
 
-        internal JsonClassInfo(Type type, JsonSerializerOptions options)
+        internal JsonClassInfo(Type type, JsonSerializerOptions options, bool partial = false)
         {
             Type = type;
             Options = options;
@@ -122,6 +221,7 @@ namespace System.Text.Json
                 out Type runtimeType,
                 Options);
 
+            ConverterBase = converter;
             ClassType = converter.ClassType;
             PropertyInfoForClassInfo = CreatePropertyInfoForClassInfo(Type, runtimeType, converter, Options);
 
@@ -213,7 +313,7 @@ namespace System.Text.Json
                             PropertyCacheArray[PropertyCache.Count] = DataExtensionProperty;
                         }
 
-                        CompleteObjectInititalization();
+                        CompleteObjectInitialization();
                     }
                     break;
                 case ClassType.Enumerable:
@@ -238,9 +338,11 @@ namespace System.Text.Json
                     Debug.Fail($"Unexpected class type: {ClassType}");
                     throw new InvalidOperationException();
             }
+
+            _isInitialized = true;
         }
 
-        internal void CompleteObjectInititalization()
+        internal void CompleteObjectInitialization()
         {
             if (PropertyCacheArray == null)
             {
@@ -258,9 +360,11 @@ namespace System.Text.Json
             {
                 InitializeConstructorParameters(converter.ConstructorInfo!);
             }
+
+            _isInitialized = true;
         }
 
-        private void InitializeConstructorParameters(ConstructorInfo constructorInfo)
+        internal void InitializeConstructorParameters(ConstructorInfo constructorInfo)
         {
             ParameterInfo[] parameters = constructorInfo!.GetParameters();
             Dictionary<string, JsonParameterInfo> parameterCache = new Dictionary<string, JsonParameterInfo>(

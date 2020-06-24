@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json
 {
@@ -83,22 +84,30 @@ namespace System.Text.Json
             _count++;
         }
 
-        internal void Initialize(Type type, JsonSerializerOptions options, bool supportContinuation)
+        internal JsonConverter Initialize(Type type, JsonSerializerOptions options, bool supportContinuation)
         {
+            SupportContinuation = supportContinuation;
             JsonClassInfo jsonClassInfo = options.GetOrAddClassForRootType(type);
+            return Initialize(jsonClassInfo);
+        }
+
+        internal JsonConverter Initialize(JsonClassInfo jsonClassInfo)
+        {
             Current.JsonClassInfo = jsonClassInfo;
 
             // The initial JsonPropertyInfo will be used to obtain the converter.
             Current.JsonPropertyInfo = jsonClassInfo.PropertyInfoForClassInfo;
 
+            JsonSerializerOptions options = jsonClassInfo.Options;
             bool preserveReferences = options.ReferenceHandler != null;
             if (preserveReferences)
             {
                 ReferenceResolver = options.ReferenceHandler!.CreateResolver(writing: false);
             }
 
-            SupportContinuation = supportContinuation;
-            UseFastPath = !supportContinuation && !preserveReferences;
+            UseFastPath = !preserveReferences;
+
+            return jsonClassInfo.PropertyInfoForClassInfo.ConverterBase;
         }
 
         internal void Push()

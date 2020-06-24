@@ -4,13 +4,29 @@
 
 namespace System.Text.Json.Serialization.Converters
 {
-    internal sealed class Int32Converter : JsonConverter<int>
+    /// <summary>
+    /// todo
+    /// </summary>
+    public sealed class Int32Converter : JsonConverter<int>
     {
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="typeToConvert"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
         public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             return reader.GetInt32();
         }
 
+        /// <summary>
+        /// todo
+        /// </summary>
+        /// <param name="writer"></param>
+        /// <param name="value"></param>
+        /// <param name="options"></param>
         public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options)
         {
             writer.WriteNumberValue(value);

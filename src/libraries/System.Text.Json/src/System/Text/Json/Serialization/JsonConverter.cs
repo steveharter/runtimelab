@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Reflection;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json.Serialization
 {
@@ -39,6 +40,11 @@ namespace System.Text.Json.Serialization
         internal abstract JsonParameterInfo CreateJsonParameterInfo();
 
         internal abstract Type? ElementType { get; }
+
+        /// <summary>
+        /// Is the converter built-in.
+        /// </summary>
+        internal bool IsInternalConverter { get; set; }
 
         /// <summary>
         /// Cached value of TypeToConvert.IsValueType, which is an expensive call.

@@ -5,10 +5,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 
-namespace System.Text.Json
+namespace System.Text.Json.Serialization.Metadata
 {
     /// <summary>
     /// todo

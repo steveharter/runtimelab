@@ -7,7 +7,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using System.Text.Encodings.Web;
-using System.Text.Json.Serialization.Converters;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json
 {
@@ -107,41 +107,6 @@ namespace System.Text.Json
             {
                 throw new ArgumentOutOfRangeException(nameof(defaults));
             }
-        }
-
-        /// <summary>
-        /// todo
-        /// </summary>
-        /// <param name="jsonClassInfo"></param>
-        public void AddClassInfo(JsonClassInfo jsonClassInfo)
-        {
-            if (jsonClassInfo.Options != this)
-            {
-                throw new ArgumentException("todo: options incorrect");
-            }
-
-            jsonClassInfo.CompleteObjectInititalization();
-
-            //todo: _classes.IsImmutable = true;
-            _classes.TryAdd(jsonClassInfo.Type, jsonClassInfo);
-
-            // Ignore if already added
-        }
-
-        /// <summary>
-        /// todo
-        /// </summary>
-        public JsonClassInfo CreateClassInfo<T>(JsonClassInfo.SerializeDelegate serializeFunc) where T : notnull
-        {
-            if (serializeFunc == null)
-            {
-                throw new ArgumentNullException(nameof(serializeFunc));
-            }
-
-            Type type = typeof(T);
-            JsonClassInfo classInfo = new JsonClassInfo(type, this);
-            JsonConverter converter = new ObjectCodeGenConverter<T>();
-            return new JsonClassInfo(type, converter, serializeFunc, this);
         }
 
         /// <summary>
@@ -473,6 +438,12 @@ namespace System.Text.Json
             }
         }
 
+        internal void AddJsonClassInfo(JsonClassInfo jsonClassInfo)
+        {
+            _haveTypesBeenCreated = true;
+            _classes.GetOrAdd(jsonClassInfo.Type, jsonClassInfo);
+        }
+
         internal JsonClassInfo GetOrAddClass(Type type)
         {
             _haveTypesBeenCreated = true;
@@ -481,7 +452,6 @@ namespace System.Text.Json
             // https://github.com/dotnet/runtime/issues/32357
             if (!_classes.TryGetValue(type, out JsonClassInfo? result))
             {
-                JsonClassInfo jsonClassInfo = new JsonClassInfo(type, this);
                 result = _classes.GetOrAdd(type, new JsonClassInfo(type, this));
             }
 
@@ -503,6 +473,8 @@ namespace System.Text.Json
 
             return jsonClassInfo;
         }
+
+        internal bool HasCustomConverters => _converters.Count > 0;
 
         internal bool TypeIsCached(Type type)
         {
